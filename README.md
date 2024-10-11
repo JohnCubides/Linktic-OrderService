@@ -1,6 +1,6 @@
 
 ----
-# Chat Boot clean architecture with .NET 8
+# Linktic OrderService clean architecture with .NET 8
 
 
 <br />
