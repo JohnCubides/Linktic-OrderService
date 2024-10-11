@@ -1,0 +1,90 @@
+
+# Docs for the Azure Web Apps Deploy action: https://github.com/Azure/webapps-deploy
+# More GitHub Actions for Azure: https://github.com/Azure/actions
+
+name: Build and deploy ASP.Net Core app to Azure Web App - appServiceApiJC
+
+on:
+  push:
+    branches:
+      - develop
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v2
+        
+      - name: App Settings Variable Substitution IdentityConn
+        uses: microsoft/variable-substitution@v1
+        with:
+          files: 'Test.Weelo/Test.Weelo/appsettings.json'
+        env:
+          ConnectionStrings.IdentityConnection: ${{ secrets.IDENTITY_CONN_QA }}
+          ConnectionStrings.ApplpicationWeeloConn: ${{ secrets.APPLICATION_CONN_QA }}
+
+          
+
+      - name: Set up .NET Core
+        uses: actions/setup-dotnet@v1
+        with:
+          dotnet-version: '5.0.x'
+          include-prerelease: true
+
+      - name: Build with dotnet
+        run: dotnet build --configuration Release
+        
+      - name: dotnet publish
+        run: dotnet publish -c Release -o ${{env.DOTNET_ROOT}}/Test.Weelo
+        
+      - name: Test
+        run: |
+          dotnet test --no-restore --verbosity normal
+
+      - name: Upload artifact for deployment job
+        uses: actions/upload-artifact@v2
+        with:
+          name: .net-app
+          path: ${{env.DOTNET_ROOT}}/Test.Weelo
+      
+      - name: deploy entity framework core migrations Identity
+        uses: benday-inc/deploy-ef-core-migration@main
+        with: 
+            path_to_directory: '${{env.DOTNET_ROOT}}/Test.Weelo'
+            migrations_dll: 'Test.Weelo.Persistence.dll'
+            migrations_namespace: 'Test.Weelo.Persistence'
+            startup_dll: 'Test.Weelo.dll'
+            dbcontext_class_name: 'IdentityContext'
+
+      - name: deploy entity framework core migrations Application
+        uses: benday-inc/deploy-ef-core-migration@main
+        with: 
+            path_to_directory: '${{env.DOTNET_ROOT}}/Test.Weelo'
+            migrations_dll: 'Test.Weelo.Persistence.dll'
+            migrations_namespace: 'Test.Weelo.Persistence'
+            startup_dll: 'Test.Weelo.dll'
+            dbcontext_class_name: 'ApplicationDbContext'
+
+  deploy:
+    runs-on: windows-latest
+    needs: build
+    environment:
+      name: 'Staging'
+      url: ${{ steps.deploy-to-webapp.outputs.webapp-url }}
+
+    steps:
+      - name: Download artifact from build job
+        uses: actions/download-artifact@v2
+        with:
+          name: .net-app
+
+      - name: Deploy to Azure Web App
+        id: deploy-to-webapp
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: 'appServiceApiJC'
+          slot-name: 'Production'
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_97EEC885B9B24734A3687579EE1079F3 }}
+          package: .
